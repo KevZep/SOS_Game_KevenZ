@@ -1,60 +1,85 @@
-# tests/test_sos_game.py
 import unittest
-from src.game_logic import GameLogic
-from src.ui import SOSGameUI
-import tkinter as tk
+from src.game_logic import SimpleGame, GeneralGame, Board, GameMode
 
-class TestGameLogic(unittest.TestCase):
+class TestSOSGame(unittest.TestCase):
+    """Test cases for SOS game covering both Simple and General modes."""
 
-    # AC 1.1: Test board size creation
-    def test_board_size_creation(self):
-        game = GameLogic(5)
-        self.assertEqual(len(game.grid), 5)
-        self.assertEqual(len(game.grid[0]), 5)
+    def test_choose_board_size(self):
+        """Test choosing a valid board size."""
+        board = Board()
+        board.set_board_size(5)
+        self.assertEqual(board.size, 5)
 
-    # AC 1.2: Test invalid board size
     def test_invalid_board_size(self):
-        with self.assertRaises(ValueError) as context:
-            game = GameLogic(2)  # Invalid size, should raise an error
-        self.assertEqual(str(context.exception), "Size must be between 3 and 10.")
+        """Test choosing an invalid board size."""
+        board = Board()
+        with self.assertRaises(ValueError):
+            board.set_board_size(11)
 
-    # AC 4.1: Test making a move
-    def test_make_move(self):
-        game = GameLogic(3)
-        success = game.place_letter(0, 0, 'S')
-        self.assertTrue(success)
-        self.assertEqual(game.grid[0][0], 'S')
+    def test_choose_game_mode(self):
+        """Test choosing a game mode."""
+        game_mode = GameMode()
+        game_mode.set_game_mode("Simple")
+        self.assertEqual(game_mode.mode, "Simple")
+        
+        game_mode.set_game_mode("General")
+        self.assertEqual(game_mode.mode, "General")
 
-    # AC 4.2: Test switching turns
-    def test_turn_switching(self):
-        game = GameLogic(3)
-        game.place_letter(0, 0, 'S')
-        self.assertEqual(game.current_turn, 'Red')  # Turn should switch to Red after Blue's move
+    def test_start_new_game_simple(self):
+        """Test starting a new game in Simple mode."""
+        game = SimpleGame(board_size=3)
+        game.start_new_game()
+        self.assertFalse(game.is_game_over())
+        self.assertEqual(game.board.size, 3)
+        self.assertEqual(game.mode, "Simple")
 
-    # AC 5.1: Test SOS detection
-    def test_sos_detection(self):
-        game = GameLogic(3)
-        game.place_letter(0, 0, 'S')
-        game.place_letter(0, 1, 'O')
-        game.place_letter(0, 2, 'S')
-        self.assertTrue(game.check_sos(0, 2))  # Should detect SOS horizontally
+    def test_start_new_game_general(self):
+        """Test starting a new game in General mode."""
+        game = GeneralGame(board_size=4)
+        game.start_new_game()
+        self.assertFalse(game.is_game_over())
+        self.assertEqual(game.board.size, 4)
+        self.assertEqual(game.mode, "General")
 
-    # AC 6.1: Test board full detection
-    def test_board_full_detection(self):
-        game = GameLogic(3)
-        for row in range(3):
-            for col in range(3):
-                game.place_letter(row, col, 'S')
-        self.assertTrue(game.is_full())
+    def test_make_move_simple_game(self):
+        """Test making a move in a Simple game."""
+        game = SimpleGame(board_size=3)
+        game.start_new_game()
+        game.make_move(0, 0, 'S')
+        self.assertEqual(game.board.get_cell(0, 0), 'S')
 
-class TestSOSGameUI(unittest.TestCase):
+    def test_simple_game_over(self):
+        """Test that a Simple game is over when 'SOS' is formed."""
+        game = SimpleGame(board_size=3)
+        game.start_new_game()
+        game.make_move(0, 0, 'S')
+        game.make_move(0, 1, 'O')
+        game.make_move(0, 2, 'S')  # Forms 'SOS'
+        self.assertTrue(game.is_game_over())
+        self.assertEqual(game.check_winner(), "Player 1")
 
-    # AC 2.1: Test game mode display
-    def test_game_mode_display(self):
-        root = tk.Tk()
-        app = SOSGameUI(root, game_logic=GameLogic(3))
-        self.assertIsNotNone(app)  # Ensures the UI initializes
-        # This test is simplified; GUI tests usually require mocks or manual inspection
+    def test_make_move_general_game(self):
+        """Test making a move in a General game."""
+        game = GeneralGame(board_size=3)
+        game.start_new_game()
+        game.make_move(0, 0, 'S')
+        self.assertEqual(game.board.get_cell(0, 0), 'S')
 
-if __name__ == "__main__":
+    def test_general_game_over(self):
+        """Test that a General game is over when the board is full."""
+        game = GeneralGame(board_size=3)
+        game.start_new_game()
+        game.make_move(0, 0, 'S')
+        game.make_move(0, 1, 'O')
+        game.make_move(0, 2, 'S')
+        game.make_move(1, 0, 'O')
+        game.make_move(1, 1, 'S')
+        game.make_move(1, 2, 'O')
+        game.make_move(2, 0, 'S')
+        game.make_move(2, 1, 'O')
+        game.make_move(2, 2, 'S')  # Board is now full
+        self.assertTrue(game.is_game_over())
+        self.assertEqual(game.check_winner(), "Player 1")  # Assuming Player 1 formed more 'SOS'
+
+if __name__ == '__main__':
     unittest.main()
