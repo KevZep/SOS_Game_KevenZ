@@ -11,16 +11,24 @@ class GameLogic:
         self.moves = []  # To record moves for replay functionality
         self.ui = ui  # Reference to the UI for color changes
 
+        print(f"Starting player: {self.current_turn}")
+
     def place_letter(self, row, col, letter):
         """Place a letter on the board and check for SOS formations."""
+        print(f"{self.current_turn}'s turn. Trying to place {letter} at ({row}, {col}).")
+
         if self.board[row][col] == '':
             self.board[row][col] = letter  # Place letter on the board
             self.moves.append((row, col, letter, self.current_turn))  # Record the move
+
+            print(f"Placed {letter} at ({row}, {col}) by {self.current_turn}.")
 
             sos_list = self.check_for_sos(row, col, letter)  # Check for SOS formations
 
             if sos_list:  # If any SOS was formed
                 self.scores[self.current_turn] += len(sos_list)  # Score points for unique SOS formations
+
+                print(f"{self.current_turn} formed SOS at {sos_list}. Current score: {self.scores[self.current_turn]}")
 
                 if self.ui:  # Check if UI is set
                     self.ui.color_squares(sos_list)  # Call to color squares for SOS
@@ -28,25 +36,31 @@ class GameLogic:
                 # Check if the game should end in Simple mode
                 if self.mode == 'Simple':
                     winner = self.current_turn  # Declare the current player as the winner
+                    print(f"{self.current_turn} wins the game in Simple mode.")
                     self.reset_game()  # Reset game for a new round
                     return winner, sos_list  # Return the winner and the SOS list
 
             # Switch turn after the current player has played
             self.current_turn = 'Red' if self.current_turn == 'Blue' else 'Blue'
+            print(f"Next turn: {self.current_turn}")
 
             # Check for a winner in General mode if the board is full
             if self.is_full():
                 winner = self.check_winner_by_score()  # Determine winner based on scores
                 if winner:
+                    print(f"{winner} wins the game in General mode with a score of {self.scores[winner]}.")
                     return winner, None  # Return winner if found
+                print("The game is a draw.")
                 return 'Draw', None  # Return draw if no winner
 
             return None, None  # Continue game if no winner or draw
 
+        print(f"Failed to place {letter} at ({row}, {col}). Cell already occupied.")
         return None, None  # Invalid move if the cell is already occupied
 
     def check_for_sos(self, row, col, letter):
         """Check for SOS formations based on the game mode."""
+        print(f"Checking for SOS formations at ({row}, {col}) with letter {letter}.")
         if self.mode == 'Simple':
             return self.check_simple_sos(row, col, letter)  # Check for SOS in Simple mode
         elif self.mode == 'General':
@@ -57,6 +71,7 @@ class GameLogic:
         """Check for SOS in Simple mode (one SOS ends the game)."""
         sos_found, coordinates = self.is_sos(row, col)  # Check for SOS formation
         if sos_found:
+            print(f"SOS found in Simple mode at {coordinates}.")
             return [coordinates]  # Return SOS coordinates as a list for consistency
         return None  # No SOS found
 
@@ -75,6 +90,8 @@ class GameLogic:
                     sos_list.append(coordinates)  # Collect unique SOS formations
                     checked_positions.add(coord_set)  # Mark as counted
 
+        if sos_list:
+            print(f"SOS found in General mode at {sos_list}.")
         return sos_list if sos_list else None  # Return unique SOS list or None
 
     def is_sos(self, row, col):
@@ -89,7 +106,7 @@ class GameLogic:
     def is_sos_in_direction(self, row, col, dr, dc):
         """Check for SOS in a specific direction."""
         coordinates = []
-    
+
         try:
             # Check for the 'O' letter
             if self.board[row][col] == 'O':
@@ -111,15 +128,19 @@ class GameLogic:
                         return True, coordinates  # Return SOS coordinates
         except IndexError:
             pass  # Ignore index errors due to boundary checks
-    
+
         return False, None  # No SOS found
 
     def is_full(self):
         """Check if the board is full."""
-        return all(self.board[row][col] != '' for row in range(self.size) for col in range(self.size))
+        full = all(self.board[row][col] != '' for row in range(self.size) for col in range(self.size))
+        if full:
+            print("The board is full.")
+        return full
 
     def check_winner_by_score(self):
         """Check if either player has reached a winning score."""
+        print(f"Checking winner by score. Blue: {self.scores['Blue']}, Red: {self.scores['Red']}")
         if self.scores['Blue'] > self.scores['Red']:
             return 'Blue'  # Blue wins
         elif self.scores['Red'] > self.scores['Blue']:
@@ -132,3 +153,4 @@ class GameLogic:
         self.scores = {'Blue': 0, 'Red': 0}  # Reset scores
         self.current_turn = random.choice(['Blue', 'Red'])  # Randomly choose starting player
         self.moves = []  # Reset moves for replay functionality
+        print("Game has been reset. New starting player: ", self.current_turn)
