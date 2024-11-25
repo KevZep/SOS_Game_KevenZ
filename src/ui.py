@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import messagebox
 from src.game_logic import GameLogic
 import random
+import os
 
 class SOSGameUI:
     def __init__(self, root, game_logic):
@@ -53,7 +54,7 @@ class SOSGameUI:
         control_frame.pack(side=tk.BOTTOM, pady=10)
 
         # Record Game Checkbox
-        self.record_var = tk.BooleanVar()
+        self.record_var = tk.BooleanVar(value=False)  # Initialize with False
         tk.Checkbutton(control_frame, text="Record Game", variable=self.record_var, bg="lightgray").pack(side=tk.LEFT)
 
         # Control Buttons
@@ -107,21 +108,25 @@ class SOSGameUI:
             tk.Radiobutton(player_frame, text="S", variable=self.red_choice, value="S", bg="lightgray").grid(row=2, column=1)
             tk.Radiobutton(player_frame, text="O", variable=self.red_choice, value="O", bg="lightgray").grid(row=2, column=2)
 
-    def start_game(self):
+    def start_game(self, is_replay=False):
         try:
             size_input = self.size_entry.get()
             size = int(size_input)
             if size < 3 or size > 10:
                 raise ValueError("Size must be between 3 and 10.")
         
+            # Clear existing record file only when starting a new game and not replaying
+            if self.record_var.get() and not is_replay:
+                open("game_record.txt", "w").close()
+
             self.game_logic = GameLogic(size, self.mode_var.get())
             self.create_game_grid(size)
             self.update_turn_label()
             self.update_scoreboard()
         
-            # Check if the first player is a computer and make a move
-            if (self.game_logic.current_turn == 'Blue' and self.blue_type.get() == "Computer") or \
-               (self.game_logic.current_turn == 'Red' and self.red_type.get() == "Computer"):
+            # Check if the first player is a computer and make a move only if not replaying
+            if not is_replay and ((self.game_logic.current_turn == 'Blue' and self.blue_type.get() == "Computer") or 
+                                  (self.game_logic.current_turn == 'Red' and self.red_type.get() == "Computer")):
                 self.root.after(500, self.ai_turn)
         except ValueError as e:
             messagebox.showerror("Invalid Input", str(e))
@@ -153,6 +158,7 @@ class SOSGameUI:
         current_letter = self.blue_choice.get() if self.game_logic.current_turn == 'Blue' else self.red_choice.get()
         winner, sos_line = self.game_logic.place_letter(row, col, current_letter)
 
+        self.record_move(row, col, current_letter)
         self.buttons[row][col].config(text=current_letter, state=tk.DISABLED)
 
         if sos_line:
@@ -196,7 +202,8 @@ class SOSGameUI:
         if row is not None and col is not None:
             self.buttons[row][col].config(text=letter, state=tk.DISABLED)
             winner, sos_line = self.game_logic.place_letter(row, col, letter)
-        
+            self.record_move(row, col, letter)
+
             if sos_line:
                 self.color_squares(sos_line)
 
@@ -260,8 +267,46 @@ class SOSGameUI:
         self.scoreboard.config(text=f"Blue: {scores['Blue']}  Red: {scores['Red']}")  # Update scoreboard label
 
     def replay_game(self):
-        # Placeholder for replay functionality
-        messagebox.showinfo("Replay", "Replay functionality is not implemented yet.")  # Inform that replay is not yet implemented
+        print("Replay button clicked")
+        if not os.path.exists("game_record.txt"):
+            messagebox.showerror("Error", "No recorded game found.")
+            return
+
+        print("Game record file found")
+        self.start_game(is_replay=True)  # Reset the game board for replay
+        with open("game_record.txt", "r") as file:
+            moves = file.readlines()
+    
+        print(f"Loaded {len(moves)} moves")
+
+        # Reset scores for replay
+        self.game_logic.scores = {'Blue': 0, 'Red': 0}
+
+        def play_move(move_index):
+            if move_index < len(moves):
+                turn, letter, row, col = moves[move_index].strip().split(',')
+                row, col = int(row), int(col)
+                print(f"Playing move: {turn} places {letter} at ({row}, {col})")
+            
+                # Place the letter without applying game rules
+                self.game_logic.board[row][col] = letter
+                self.buttons[row][col].config(text=letter, state=tk.DISABLED)
+            
+                # Check for SOS formations
+                sos_list = self.game_logic.check_for_sos(row, col, letter)
+                if sos_list:
+                    self.game_logic.scores[turn] += len(sos_list)
+                    self.color_squares(sos_list)
+            
+                self.game_logic.current_turn = turn
+                self.update_turn_label()
+                self.update_scoreboard()
+                self.root.after(1000, play_move, move_index + 1)  # Play next move after 1 second
+            else:
+                winner = self.game_logic.check_winner_by_score()
+                messagebox.showinfo("Replay Finished", f"The replay has finished. Winner: {winner}")
+
+        play_move(0)
 
     def end_game_dialog(self, message):
         result = messagebox.askquestion("Game Over", f"{message}\n\nDo you want to start a new game?", 
@@ -269,6 +314,13 @@ class SOSGameUI:
         if result == 'yes':
             self.start_game()
         # If 'no', do nothing and let the user change settings if desired
+
+    def record_move(self, row, col, letter):
+        if self.record_var.get():
+            with open("game_record.txt", "a") as file:
+                move = f"{self.game_logic.current_turn},{letter},{row},{col}\n"
+                file.write(move)
+                print(f"Recorded move: {move.strip()}")  # Add this line
 
 if __name__ == "__main__":
     root = tk.Tk()  # Create the main application window
